@@ -5,6 +5,7 @@ var path = require('path');
 var fs = require('fs');
 var ejsLayouts = require("express-ejs-layouts");
 var bodyParser = require('body-parser');
+var db = require("./models");
 
 var app = express();
 
@@ -24,9 +25,14 @@ app.get('/', function(req, res) {
 });
 
 app.get('/games', function(req, res) {
-    var games = getGames();
 
-    res.render('games-index', { games: games });
+
+    db.game.findAll().then(function(games) {
+        res.render('games-index', { games: games });
+    }).catch(function(error) {
+        res.status(404).render('error');
+    });
+
 });
 
 app.get('/games/new', function(req, res) {
@@ -34,23 +40,29 @@ app.get('/games/new', function(req, res) {
 });
 
 app.post('/games', function(req, res) {
-    console.log(req.body);
     var newGame = req.body;
 
-    var games = getGames();
-    games.push(newGame);
-    saveGames(games);
+    db.game.create({
+        name: newGame.name,
+        description: newGame.description,
+    }).then(function(game) {
+        res.status(303).redirect('/game/' + game.name);
+    }).catch(function(error) {
+        res.status(404).render('error');
+    });
 
-    res.redirect('/games');
 });
 
 // show page
 app.get('/game/:name', function(req, res) {
     var nameOfTheGame = req.params.name;
-    var games = getGames();
-    var game = getGame(games, nameOfTheGame);
 
-    res.render('games-show', game);
+    db.game.findOne().then(function(games) {
+        res.render('games-show', { games: games });
+    }).catch(function(error) {
+        res.status(404).render('error');
+    });
+
 });
 
 app.get('/game/:name/edit', function(req, res) {
@@ -89,32 +101,7 @@ app.delete('/game/:name', function(req, res) {
     res.send(game);
 });
 
-// helper functions
 
-function getGame(games, nameOfTheGame) {
-    var game = null;
-
-    for (var i = 0; i < games.length; i++) {
-        if (games[i].name.toLowerCase() == nameOfTheGame.toLowerCase()) {
-            game = games[i];
-            break;
-        }
-    }
-
-    return game;
-}
-
-// Read list of games from file.
-function getGames() {
-    var fileContents = fs.readFileSync('./games.json'); // :'(
-    var games = JSON.parse(fileContents);
-    return games;
-}
-
-// Write list of games to file.
-function saveGames(games) {
-    fs.writeFileSync('./games.json', JSON.stringify(games));
-}
 
 // start the server
 
